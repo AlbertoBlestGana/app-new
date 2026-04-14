@@ -1,193 +1,244 @@
+let nombre="";
+let apellido="";
 
-let nombre = "";
-let apellido = "";
-let equipo = "";
-let curso = "";
-let paso = "equipo"; // 🔥 control de flujo
+let equipo="";
+let curso="";
+
+let paso="equipo";
+
+let escaneando=false;
 
 const beep = new Audio("https://www.soundjay.com/buttons/beep-07.wav");
 
-// SW
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js");
+/* SERVICE WORKER */
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
 }
 
-/* ---------------- LOGIN ---------------- */
+/* LOGIN */
 
-function guardarUsuario() {
-    nombre = document.getElementById("nombre").value.trim();
-    apellido = document.getElementById("apellido").value.trim();
+function guardarUsuario(){
 
-    if (!nombre || !apellido) {
-        alert("Completa datos");
-        return;
-    }
+nombre=document.getElementById("nombre").value.trim();
+apellido=document.getElementById("apellido").value.trim();
 
-    localStorage.setItem("usuario", JSON.stringify({ nombre, apellido }));
-    iniciarApp();
+if(!nombre || !apellido){
+alert("Completa datos");
+return;
 }
 
-function cambiarUsuario() {
-    localStorage.removeItem("usuario");
-    location.reload();
+localStorage.setItem("usuario",JSON.stringify({nombre,apellido}));
+
+iniciarApp();
+
 }
 
-/* ---------------- APP ---------------- */
+function cambiarUsuario(){
 
-function iniciarApp() {
-    const user = JSON.parse(localStorage.getItem("usuario"));
-    if (!user) return;
+localStorage.removeItem("usuario");
+location.reload();
 
-    nombre = user.nombre;
-    apellido = user.apellido;
-
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-
-    document.getElementById("usuario").innerText =
-        `👤 ${nombre} ${apellido}`;
-
-    cargarHistorial();
-    iniciarEscaneo();
 }
 
-/* ---------------- ESCANEO ---------------- */
+/* APP */
 
-async function iniciarEscaneo() {
-    const qr = new Html5Qrcode("reader");
+function iniciarApp(){
 
-    const devices = await Html5Qrcode.getCameras();
+const user=JSON.parse(localStorage.getItem("usuario"));
 
-    if (!devices.length) {
-        alert("No hay cámara disponible");
-        return;
-    }
+if(!user) return;
 
-    // 🔥 FORZAR CÁMARA TRASERA REAL
-    let cameraId = devices[0].id;
+nombre=user.nombre;
+apellido=user.apellido;
 
-    for (let d of devices) {
-        const label = d.label.toLowerCase();
-        if (
-            label.includes("back") ||
-            label.includes("rear") ||
-            label.includes("environment") ||
-            label.includes("trasera") ||
-            label.includes("posterior")
-        ) {
-            cameraId = d.id;
-            break;
-        }
-    }
+document.getElementById("login").style.display="none";
+document.getElementById("app").style.display="block";
 
-    qr.start(
-        cameraId,
-        { fps: 10, aspectRatio: 1.777 },
-        async (text) => {
+document.getElementById("usuario").innerText=`👤 ${nombre} ${apellido}`;
 
-            if (text.length < 2) return;
+cargarHistorial();
 
-            beep.play();
+iniciarEscaneo();
 
-            // 🔥 FLUJO SECUENCIAL
-            if (paso === "equipo") {
-
-                equipo = text;
-                document.getElementById("resultado").innerText =
-                    "Equipo: " + text;
-
-                paso = "curso";
-
-                qr.stop();
-                setTimeout(() => iniciarEscaneo(), 500);
-            }
-
-            else if (paso === "curso") {
-
-                curso = text;
-                document.getElementById("resultado").innerText =
-                    `Equipo: ${equipo} | Curso: ${curso}`;
-
-                guardarRegistro();
-
-                paso = "equipo";
-
-                qr.stop();
-                setTimeout(() => iniciarEscaneo(), 500);
-            }
-        }
-    );
 }
 
-/* ---------------- GUARDAR ---------------- */
+/* ESCANEO */
 
-function guardarRegistro() {
-    let registros = JSON.parse(localStorage.getItem("registros")) || [];
+async function iniciarEscaneo(){
 
-    registros.push({
-        nombre,
-        apellido,
-        equipo,
-        curso,
-        fecha: new Date().toISOString()
-    });
+const qr = new Html5Qrcode("reader");
 
-    localStorage.setItem("registros", JSON.stringify(registros));
+const devices = await Html5Qrcode.getCameras();
 
-    equipo = "";
-    curso = "";
-
-    cargarHistorial();
+if(!devices.length){
+alert("No hay cámara");
+return;
 }
 
-/* ---------------- HISTORIAL ---------------- */
+let cameraId=devices[0].id;
 
-function cargarHistorial() {
-    let registros = JSON.parse(localStorage.getItem("registros")) || [];
+for(let d of devices){
 
-    let html = "";
+let label=d.label.toLowerCase();
 
-    registros.slice(-10).reverse().forEach(r => {
-        html += `<div>${r.nombre} ${r.apellido} | ${r.equipo} | ${r.curso}</div>`;
-    });
-
-    document.getElementById("historial").innerHTML = html;
+if(label.includes("back")||label.includes("rear")||label.includes("environment")){
+cameraId=d.id;
+break;
 }
 
-/* ---------------- EXPORT EXCEL ---------------- */
-
-function exportarCSV() {
-    let registros = JSON.parse(localStorage.getItem("registros")) || [];
-
-    let csv = "Nombre;Apellido;Equipo;Curso;Fecha\n";
-
-    registros.forEach(r => {
-        let fecha = new Date(r.fecha).toLocaleString();
-        csv += `${r.nombre};${r.apellido};${r.equipo};${r.curso};${fecha}\n`;
-    });
-
-    let blob = new Blob(["\uFEFF" + csv], {
-        type: "text/csv;charset=utf-8;"
-    });
-
-    let url = URL.createObjectURL(blob);
-
-    let a = document.createElement("a");
-    a.href = url;
-    a.download = "registros.csv";
-    a.click();
 }
 
-function finalizarRegistro() {
-    if (confirm("Exportar Excel?")) {
-        exportarCSV();
-    }
+qr.start(
+cameraId,
+{fps:10},
+(text)=>{
+
+if(escaneando) return;
+
+escaneando=true;
+
+beep.play();
+
+if(paso==="equipo"){
+
+equipo=text;
+
+document.getElementById("resultado").innerText="Equipo: "+equipo;
+
+paso="curso";
+
 }
 
-/* ---------------- AUTO LOGIN ---------------- */
+else{
 
-window.onload = () => {
-    if (localStorage.getItem("usuario")) {
-        iniciarApp();
-    }
+curso=text;
+
+document.getElementById("resultado").innerText=`Equipo: ${equipo} | Curso: ${curso}`;
+
+guardarRegistro();
+
+paso="equipo";
+
+}
+
+setTimeout(()=>escaneando=false,800);
+
+});
+
+}
+
+/* GUARDAR */
+
+function guardarRegistro(){
+
+let registros=JSON.parse(localStorage.getItem("registros"))||[];
+
+registros.push({
+nombre,
+apellido,
+equipo,
+curso,
+fecha:new Date().toLocaleString()
+});
+
+localStorage.setItem("registros",JSON.stringify(registros));
+
+equipo="";
+curso="";
+
+cargarHistorial();
+
+}
+
+/* HISTORIAL */
+
+function cargarHistorial(){
+
+let registros=JSON.parse(localStorage.getItem("registros"))||[];
+
+let html="";
+
+registros.slice(-10).reverse().forEach(r=>{
+
+html+=`<div>${r.nombre} ${r.apellido} | 📦 ${r.equipo} | 🎓 ${r.curso}</div>`;
+
+});
+
+document.getElementById("historial").innerHTML=html;
+
+document.getElementById("contador").innerText="Escaneados: "+registros.length;
+
+}
+
+/* DESHACER */
+
+function deshacer(){
+
+let registros=JSON.parse(localStorage.getItem("registros"))||[];
+
+if(registros.length===0){
+alert("Nada que deshacer");
+return;
+}
+
+registros.pop();
+
+localStorage.setItem("registros",JSON.stringify(registros));
+
+cargarHistorial();
+
+}
+
+/* EXPORTAR EXCEL */
+
+function exportarExcel(){
+
+let registros=JSON.parse(localStorage.getItem("registros"))||[];
+
+if(registros.length===0){
+alert("No hay registros");
+return;
+}
+
+let ws=XLSX.utils.json_to_sheet(registros);
+
+let wb=XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(wb,ws,"Registro");
+
+let fecha=new Date().toISOString().replace(/[:.]/g,"-");
+
+XLSX.writeFile(wb,"registro-"+fecha+".xlsx");
+
+}
+
+/* FINALIZAR */
+
+function finalizarRegistro(){
+
+if(!confirm("Exportar Excel y comenzar nuevo registro?")) return;
+
+exportarExcel();
+
+localStorage.removeItem("registros");
+
+document.getElementById("resultado").innerText="";
+
+paso="equipo";
+
+cargarHistorial();
+
+alert("Registro exportado y nuevo iniciado");
+
+}
+
+/* AUTO LOGIN */
+
+window.onload=()=>{
+
+if(localStorage.getItem("usuario")){
+iniciarApp();
+}
+
 };
