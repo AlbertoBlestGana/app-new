@@ -1,17 +1,22 @@
-self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open("qr-app").then(cache => {
-      return cache.addAll([
-        "./",
-        "./index.html",
-        "./app.js"
-      ]);
-    })
-  );
+const CACHE_NAME="qr-app-v3";
+
+self.addEventListener("install",e=>{
+self.skipWaiting();
 });
 
-self.addEventListener("fetch", e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
-  );
+self.addEventListener("activate",event=>{
+event.waitUntil(
+caches.keys().then(keys=>{
+return Promise.all(
+keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))
+);
+})
+);
+self.clients.claim();
+});
+
+self.addEventListener("fetch",event=>{
+event.respondWith(
+fetch(event.request).catch(()=>caches.match(event.request))
+);
 });
