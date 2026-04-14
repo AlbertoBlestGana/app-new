@@ -63,11 +63,21 @@ iniciarEscaneo();
 
 }
 
-/* ESCANEO */
+/* ESCANEO CON CAMARA TRASERA */
 
 async function iniciarEscaneo(){
 
 const qr = new Html5Qrcode("reader");
+
+try{
+
+await qr.start(
+{ facingMode: "environment" },
+{ fps: 10, qrbox: { width: 250, height: 250 } },
+(text)=>procesarQR(text)
+);
+
+}catch(err){
 
 const devices = await Html5Qrcode.getCameras();
 
@@ -76,23 +86,36 @@ alert("No hay cámara");
 return;
 }
 
-let cameraId=devices[0].id;
+let cameraId = devices[0].id;
 
 for(let d of devices){
 
 let label=d.label.toLowerCase();
 
-if(label.includes("back")||label.includes("rear")||label.includes("environment")){
+if(
+label.includes("back") ||
+label.includes("rear") ||
+label.includes("environment") ||
+label.includes("trasera") ||
+label.includes("posterior")
+){
 cameraId=d.id;
 break;
 }
 
 }
 
-qr.start(
+await qr.start(
 cameraId,
-{fps:10},
-(text)=>{
+{ fps:10, qrbox:{width:250,height:250} },
+(text)=>procesarQR(text)
+);
+
+}
+
+}
+
+function procesarQR(text){
 
 if(escaneando) return;
 
@@ -123,8 +146,6 @@ paso="equipo";
 }
 
 setTimeout(()=>escaneando=false,800);
-
-});
 
 }
 
