@@ -1,10 +1,10 @@
 {
-"name":"Registro QR",
-"short_name":"QR",
+"name":"Registro Equipos",
+"short_name":"Equipos",
 "start_url":"./",
 "display":"standalone",
 "background_color":"#ffffff",
-"theme_color":"#000000",
+"theme_color":"#0f6c6d",
 "icons":[
 {
 "src":"icon.png",
