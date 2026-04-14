@@ -1,265 +1,241 @@
-let nombre="";
-let apellido="";
+let docente=""
+let curso=""
+let alumno=""
 
-let equipo="";
-let curso="";
+let qr=null
+let cursos={}
+let registrosDuplicados=new Set()
 
-let paso="equipo";
+/* CARGAR CURSOS DESDE GOOGLE SHEETS */
 
-let escaneando=false;
+async function cargarCursos(){
 
-const beep = new Audio("https://www.soundjay.com/buttons/beep-07.wav");
+const url="PEGA_AQUI_TU_URL_DE_GOOGLE_SCRIPT"
 
-/* SERVICE WORKER */
+const res=await fetch(url)
 
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("service-worker.js");
-}
+cursos=await res.json()
 
-/* LOGIN */
-
-function guardarUsuario(){
-
-nombre=document.getElementById("nombre").value.trim();
-apellido=document.getElementById("apellido").value.trim();
-
-if(!nombre || !apellido){
-alert("Completa datos");
-return;
-}
-
-localStorage.setItem("usuario",JSON.stringify({nombre,apellido}));
-
-iniciarApp();
+mostrarCursos()
 
 }
 
-function cambiarUsuario(){
+/* INICIO */
 
-localStorage.removeItem("usuario");
-location.reload();
+function iniciarSistema(){
+
+docente=document.getElementById("docente").value.trim()
+
+if(!docente){
+alert("Ingrese nombre del docente")
+return
+}
+
+document.getElementById("login").style.display="none"
+document.getElementById("app").style.display="block"
+
+document.getElementById("docenteNombre").innerText="Docente: "+docente
+
+cargarCursos()
 
 }
 
-/* APP */
+/* CURSOS */
 
-function iniciarApp(){
+function mostrarCursos(){
 
-const user=JSON.parse(localStorage.getItem("usuario"));
+let html=""
 
-if(!user) return;
+for(let c in cursos){
 
-nombre=user.nombre;
-apellido=user.apellido;
-
-document.getElementById("login").style.display="none";
-document.getElementById("app").style.display="block";
-
-document.getElementById("usuario").innerText=`👤 ${nombre} ${apellido}`;
-
-cargarHistorial();
-
-iniciarEscaneo();
+html+=`<div class="lista" onclick="seleccionarCurso('${c}')">${c}</div>`
 
 }
 
-/* ESCANEO CON CAMARA TRASERA */
+document.getElementById("cursos").innerHTML=html
+
+}
+
+/* CURSO */
+
+function seleccionarCurso(c){
+
+curso=c
+
+mostrarAlumnos()
+
+}
+
+/* ALUMNOS */
+
+function mostrarAlumnos(){
+
+let lista=cursos[curso]
+
+let html=""
+
+lista.forEach(a=>{
+
+html+=`<div class="lista alumno">${a}</div>`
+
+})
+
+document.getElementById("alumnos").innerHTML=html
+
+document.querySelectorAll(".alumno").forEach(el=>{
+
+el.onclick=()=>{
+
+alumno=el.innerText
+
+document.getElementById("resultado").innerText="Escanee equipo para "+alumno
+
+iniciarEscaneo()
+
+}
+
+})
+
+}
+
+/* BUSCAR */
+
+function filtrarAlumno(){
+
+let filtro=document.getElementById("buscarAlumno").value.toLowerCase()
+
+document.querySelectorAll(".alumno").forEach(el=>{
+
+let nombre=el.innerText.toLowerCase()
+
+el.style.display=nombre.includes(filtro)?"block":"none"
+
+})
+
+}
+
+/* ESCANEO */
 
 async function iniciarEscaneo(){
 
-const qr = new Html5Qrcode("reader");
+if(qr)return
 
-try{
-
-await qr.start(
-{ facingMode: "environment" },
-{ fps: 10, qrbox: { width: 250, height: 250 } },
-(text)=>procesarQR(text)
-);
-
-}catch(err){
-
-const devices = await Html5Qrcode.getCameras();
-
-if(!devices.length){
-alert("No hay cámara");
-return;
-}
-
-let cameraId = devices[0].id;
-
-for(let d of devices){
-
-let label=d.label.toLowerCase();
-
-if(
-label.includes("back") ||
-label.includes("rear") ||
-label.includes("environment") ||
-label.includes("trasera") ||
-label.includes("posterior")
-){
-cameraId=d.id;
-break;
-}
-
-}
+qr=new Html5Qrcode("reader")
 
 await qr.start(
-cameraId,
-{ fps:10, qrbox:{width:250,height:250} },
-(text)=>procesarQR(text)
-);
+{facingMode:"environment"},
+{fps:10,qrbox:250},
+onScan
+)
 
 }
 
-}
+/* SCAN */
 
-function procesarQR(text){
+function onScan(text){
 
-if(escaneando) return;
+if(registrosDuplicados.has(text)){
 
-escaneando=true;
+document.getElementById("resultado").innerText="⚠ Equipo ya registrado"
 
-beep.play();
-
-if(paso==="equipo"){
-
-equipo=text;
-
-document.getElementById("resultado").innerText="Equipo: "+equipo;
-
-paso="curso";
+return
 
 }
 
-else{
+registrosDuplicados.add(text)
 
-curso=text;
+guardarRegistro(text)
 
-document.getElementById("resultado").innerText=`Equipo: ${equipo} | Curso: ${curso}`;
+document.getElementById("resultado").innerText=
+`${alumno} registró equipo ${text}`
 
-guardarRegistro();
-
-paso="equipo";
-
-}
-
-setTimeout(()=>escaneando=false,800);
+mostrarEstadisticas()
 
 }
 
 /* GUARDAR */
 
-function guardarRegistro(){
+function guardarRegistro(equipo){
 
-let registros=JSON.parse(localStorage.getItem("registros"))||[];
+let registros=JSON.parse(localStorage.getItem("registros"))||[]
 
 registros.push({
-nombre,
-apellido,
-equipo,
+
+docente,
 curso,
+alumno,
+equipo,
 fecha:new Date().toLocaleString()
-});
 
-localStorage.setItem("registros",JSON.stringify(registros));
+})
 
-equipo="";
-curso="";
-
-cargarHistorial();
+localStorage.setItem("registros",JSON.stringify(registros))
 
 }
 
-/* HISTORIAL */
+/* ESTADISTICAS */
 
-function cargarHistorial(){
+function mostrarEstadisticas(){
 
-let registros=JSON.parse(localStorage.getItem("registros"))||[];
+let registros=JSON.parse(localStorage.getItem("registros"))||[]
 
-let html="";
+let conteo={}
 
-registros.slice(-10).reverse().forEach(r=>{
+registros.forEach(r=>{
 
-html+=`<div>${r.nombre} ${r.apellido} | 📦 ${r.equipo} | 🎓 ${r.curso}</div>`;
+if(!conteo[r.curso])conteo[r.curso]=0
 
-});
+conteo[r.curso]++
 
-document.getElementById("historial").innerHTML=html;
+})
 
-document.getElementById("contador").innerText="Escaneados: "+registros.length;
+let html=""
 
-}
+for(let c in conteo){
 
-/* DESHACER */
-
-function deshacer(){
-
-let registros=JSON.parse(localStorage.getItem("registros"))||[];
-
-if(registros.length===0){
-alert("Nada que deshacer");
-return;
-}
-
-registros.pop();
-
-localStorage.setItem("registros",JSON.stringify(registros));
-
-cargarHistorial();
+html+=`<div>${c}: ${conteo[c]} equipos registrados</div>`
 
 }
 
-/* EXPORTAR EXCEL */
+document.getElementById("estadisticas").innerHTML=html
+
+}
+
+/* EXCEL */
 
 function exportarExcel(){
 
-let registros=JSON.parse(localStorage.getItem("registros"))||[];
+let registros=JSON.parse(localStorage.getItem("registros"))||[]
 
-if(registros.length===0){
-alert("No hay registros");
-return;
-}
+let wb=XLSX.utils.book_new()
 
-let ws=XLSX.utils.json_to_sheet(registros);
+let cursosUnicos=[...new Set(registros.map(r=>r.curso))]
 
-let wb=XLSX.utils.book_new();
+cursosUnicos.forEach(c=>{
 
-XLSX.utils.book_append_sheet(wb,ws,"Registro");
+let datos=registros
+.filter(r=>r.curso===c)
+.map(r=>({
 
-let fecha=new Date().toISOString().replace(/[:.]/g,"-");
+Docente:r.docente,
+Alumno:r.alumno,
+Equipo:r.equipo,
+Fecha:r.fecha
 
-XLSX.writeFile(wb,"registro-"+fecha+".xlsx");
+}))
 
-}
+let ws=XLSX.utils.json_to_sheet(datos)
 
-/* FINALIZAR */
+XLSX.utils.book_append_sheet(wb,ws,c)
 
-function finalizarRegistro(){
+})
 
-if(!confirm("Exportar Excel y comenzar nuevo registro?")) return;
-
-exportarExcel();
-
-localStorage.removeItem("registros");
-
-document.getElementById("resultado").innerText="";
-
-paso="equipo";
-
-cargarHistorial();
-
-alert("Registro exportado y nuevo iniciado");
+XLSX.writeFile(wb,"registro-equipos.xlsx")
 
 }
-
-/* AUTO LOGIN */
 
 window.onload=()=>{
 
-if(localStorage.getItem("usuario")){
-iniciarApp();
-}
+mostrarEstadisticas()
 
-};
+}
